@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍺 Pub Crawl — Bachelor Party</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,400;0,600;0,700;1,400&family=Barlow+Condensed:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b08;
+    --surface: #1a1610;
+    --surface2: #221e17;
+    --surface3: #2c2720;
+    --border: #3a3228;
+    --gold: #d4a017;
+    --gold-light: #f0c040;
+    --red: #c0392b;
+    --green: #27ae60;
+    --text: #e8dcc8;
+    --text-dim: #a09070;
+    --text-muted: #6a5f4a;
+    --team1: #e8a020;
+    --team2: #3a9fd5;
+    --team3: #c0392b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(212,160,23,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(200,112,32,0.06) 0%, transparent 50%);
+  }
+
+  /* Sync status bar */
+  #sync-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 3px; background: transparent; transition: background 0.3s;
+  }
+  #sync-bar.syncing { background: linear-gradient(90deg, transparent, var(--gold), transparent); animation: syncpulse 1s infinite; }
+  #sync-bar.online  { background: var(--green); }
+  #sync-bar.offline { background: var(--red); }
+  @keyframes syncpulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  .sync-indicator {
+    position: fixed; top: 8px; right: 12px; z-index: 201;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 10px; pointer-events: none;
+    transition: all 0.3s;
+  }
+  .sync-indicator.online  { background: rgba(39,174,96,0.2); color: var(--green); border: 1px solid rgba(39,174,96,0.4); }
+  .sync-indicator.offline { background: rgba(192,57,43,0.2); color: var(--red);   border: 1px solid rgba(192,57,43,0.4); }
+  .sync-indicator.syncing { background: rgba(212,160,23,0.2); color: var(--gold); border: 1px solid rgba(212,160,23,0.4); }
+
+  /* Setup screen */
+  #setup-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 32px 20px; text-align: center; gap: 20px;
+  }
+  #setup-screen h1 { font-family: 'Bebas Neue', sans-serif; font-size: 48px; letter-spacing: 4px; color: var(--gold); }
+  #setup-screen p  { color: var(--text-dim); font-family: 'Barlow Condensed', sans-serif; font-size: 15px; letter-spacing: 1.5px; line-height: 1.6; max-width: 480px; }
+  .setup-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 100%; max-width: 520px; text-align: left; }
+  .setup-card h2 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--gold); margin-bottom: 14px; }
+  .setup-input {
+    width: 100%; background: var(--surface3); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 10px 12px; margin-bottom: 10px; transition: border-color 0.2s;
+  }
+  .setup-input:focus { outline: none; border-color: var(--gold); }
+  .setup-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; display: block; }
+  .setup-error { color: var(--red); font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 1px; margin-top: 6px; min-height: 20px; }
+  .setup-hint { background: rgba(212,160,23,0.08); border: 1px solid rgba(212,160,23,0.2); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--text-dim); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; line-height: 1.6; }
+  .setup-hint code { background: var(--surface3); color: var(--gold); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  /* Header */
+  .app-header {
+    background: linear-gradient(180deg, #1a1610 0%, #0d0b08 100%);
+    border-bottom: 2px solid var(--gold);
+    padding: 16px 20px 12px;
+    text-align: center;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.8);
+  }
+  .app-header h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(28px, 6vw, 48px); letter-spacing: 4px; color: var(--gold); text-shadow: 0 0 30px rgba(212,160,23,0.4); line-height: 1; }
+  .app-header .subtitle { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+
+  /* Nav */
+  .nav-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab { flex: 1; min-width: 90px; padding: 12px 8px; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text-dim); background: var(--surface2); }
+  .nav-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: var(--surface2); }
+
+  /* Pages */
+  .page { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 3px; color: var(--gold); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+
+  .golf-note { display: inline-flex; align-items: center; gap: 6px; background: rgba(212,160,23,0.1); border: 1px solid rgba(212,160,23,0.3); border-radius: 6px; padding: 6px 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+
+  /* Scoreboard */
+  .scoreboard { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 28px; }
+  .score-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px 16px; text-align: center; position: relative; overflow: hidden; transition: transform 0.2s; }
+  .score-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .score-card.t1::before { background: var(--team1); }
+  .score-card.t2::before { background: var(--team2); }
+  .score-card.t3::before { background: var(--team3); }
+  .score-card:hover { transform: translateY(-2px); }
+  .score-card.leader { border-color: var(--gold); box-shadow: 0 0 20px rgba(212,160,23,0.2); }
+  .team-photo-wrap { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 8px; overflow: hidden; border: 2px solid var(--border); background: var(--surface3); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); }
+  .score-card.t1 .team-photo-wrap { border-color: var(--team1); }
+  .score-card.t2 .team-photo-wrap { border-color: var(--team2); }
+  .score-card.t3 .team-photo-wrap { border-color: var(--team3); }
+  .team-photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .score-card .team-name { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; margin-bottom: 4px; line-height: 1.1; }
+  .score-card.t1 .team-name { color: var(--team1); }
+  .score-card.t2 .team-name { color: var(--team2); }
+  .score-card.t3 .team-name { color: var(--team3); }
+  .score-card .total-score { font-family: 'Bebas Neue', sans-serif; font-size: 44px; line-height: 1; color: var(--text); }
+  .score-card .score-label { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+  .leader-badge { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; background: var(--gold); color: #000; padding: 2px 7px; border-radius: 10px; font-weight: 700; margin-top: 4px; }
+
+  /* Table */
+  .hole-table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { background: var(--surface3); font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th.hole-col { text-align: left; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+  td.hole-info { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .hole-num { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); width: 28px; display: inline-block; text-align: center; }
+  .hole-drink { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1px; color: var(--text-muted); }
+  .score-input { width: 52px; background: var(--surface3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 20px; text-align: center; padding: 4px; transition: border-color 0.2s; appearance: none; -moz-appearance: textfield; }
+  .score-input::-webkit-outer-spin-button, .score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .score-input:focus { outline: none; box-shadow: 0 0 8px rgba(212,160,23,0.2); }
+  .score-input.t1:focus { border-color: var(--team1); }
+  .score-input.t2:focus { border-color: var(--team2); }
+  .score-input.t3:focus { border-color: var(--team3); }
+  .totals-row td { font-family: 'Bebas Neue', sans-serif; font-size: 20px; border-top: 2px solid var(--border); background: var(--surface3); }
+  .totals-row td.label { text-align: left; color: var(--gold); font-size: 16px; letter-spacing: 2px; }
+
+  /* Quests */
+  .quest-list { display: flex; flex-direction: column; gap: 10px; }
+  .quest-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .quest-top { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .quest-emoji { font-size: 24px; flex-shrink: 0; }
+  .quest-desc { flex: 1; }
+  .quest-desc strong { display: block; color: var(--text); font-weight: 700; }
+  .quest-desc span { font-size: 13px; color: var(--text-muted); }
+  .quest-pts { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); white-space: nowrap; flex-shrink: 0; }
+  .quest-team-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .quest-team-award { flex: 1; min-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface3); cursor: pointer; transition: all 0.2s; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); }
+  .quest-team-award:hover { background: var(--surface2); }
+  .quest-team-award.aw-t1 { background: rgba(232,160,32,0.15); border-color: var(--team1); color: var(--team1); }
+  .quest-team-award.aw-t2 { background: rgba(58,159,213,0.15); border-color: var(--team2); color: var(--team2); }
+  .quest-team-award.aw-t3 { background: rgba(192,57,43,0.15); border-color: var(--team3); color: var(--team3); }
+  .quest-team-award .award-check { font-size: 18px; }
+
+  /* Admin lock */
+  #admin-lock { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; gap: 20px; text-align: center; }
+  #admin-lock .lock-icon { font-size: 56px; opacity: 0.6; }
+  #admin-lock h2 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; color: var(--gold); }
+  #admin-lock p { font-size: 14px; color: var(--text-muted); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
+  #admin-pw-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 8px; text-align: center; padding: 12px 20px; width: 200px; transition: border-color 0.2s; }
+  #admin-pw-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 12px rgba(212,160,23,0.2); }
+  .lock-error { color: var(--red); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; height: 20px; }
+  #admin-content { display: none; }
+
+  /* Admin */
+  .admin-grid { display: flex; flex-direction: column; gap: 24px; }
+  .admin-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .admin-card h3 { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: var(--gold); margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .form-row input, .form-row select { background: var(--surface3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Barlow', sans-serif; font-size: 14px; padding: 9px 12px; flex: 1; min-width: 120px; transition: border-color 0.2s; }
+  .form-row input:focus, .form-row select:focus { outline: none; border-color: var(--gold); }
+  .form-row select option { background: var(--surface2); }
+  .btn { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .btn-gold { background: var(--gold); color: #000; font-weight: 700; }
+  .btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); }
+  .btn-danger { background: transparent; border: 1px solid var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .item-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .item-row { display: flex; align-items: center; gap: 10px; background: var(--surface3); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+  .item-row .item-num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--gold); width: 24px; text-align: center; flex-shrink: 0; }
+  .item-row .item-text { flex: 1; }
+  .item-row .item-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .item-row .item-actions { display: flex; gap: 6px; }
+
+  /* Team grid */
+  .team-3-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .team-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .team-col label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+  .team-col.t1 label { color: var(--team1); }
+  .team-col.t2 label { color: var(--team2); }
+  .team-col.t3 label { color: var(--team3); }
+  .team-col input[type="text"] { background: var(--surface3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; padding: 7px 10px; width: 100%; text-align: center; transition: border-color 0.2s; }
+  .team-col.t1 input[type="text"]:focus { border-color: var(--team1); outline: none; }
+  .team-col.t2 input[type="text"]:focus { border-color: var(--team2); outline: none; }
+  .team-col.t3 input[type="text"]:focus { border-color: var(--team3); outline: none; }
+  .photo-circle { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; border: 2px solid var(--border); background: var(--surface3); display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; transition: border-color 0.2s, transform 0.2s; }
+  .photo-circle:hover { transform: scale(1.05); }
+  .team-col.t1 .photo-circle { border-color: var(--team1); }
+  .team-col.t2 .photo-circle { border-color: var(--team2); }
+  .team-col.t3 .photo-circle { border-color: var(--team3); }
+  .photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-hint { font-size: 11px; color: var(--text-muted); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; text-align: center; }
+  input[type="file"] { display: none; }
+
+  .drink-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .drink-tag { background: var(--surface3); border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .drink-tag button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; transition: color 0.2s; }
+  .drink-tag button:hover { color: var(--red); }
+
+  #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--gold); color: #000; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase; padding: 12px 24px; border-radius: 30px; font-weight: 700; transition: transform 0.3s ease; z-index: 999; pointer-events: none; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-family: 'Barlow Condensed', sans-serif; font-size: 16px; letter-spacing: 2px; text-transform: uppercase; }
+  .empty-state .icon { font-size: 40px; display: block; margin-bottom: 12px; opacity: 0.4; }
+
+  @media (max-width: 500px) {
+    .scoreboard { gap: 8px; }
+    .score-card .total-score { font-size: 32px; }
+    .team-photo-wrap { width: 48px; height: 48px; font-size: 20px; }
+    .team-3-grid { gap: 8px; }
+    .photo-circle { width: 56px; height: 56px; font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ MAIN APP ════════════════════════════════════════════════════════════ -->
+<div id="app">
+  <div id="sync-bar"></div>
+  <div class="sync-indicator" id="sync-indicator">● Connecting…</div>
+
+  <header class="app-header">
+    <h1>🍺 Pub Crawl</h1>
+    <div class="subtitle">Bachelor Party · Golf Rules</div>
+  </header>
+
+  <nav class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('scorecard')">📋 Scorecard</div>
+    <div class="nav-tab" onclick="showPage('quests')">⚡ Quests</div>
+    <div class="nav-tab" onclick="showPage('leaderboard')">🏆 Leaderboard</div>
+    <div class="nav-tab" onclick="showPage('admin')">⚙️ Admin</div>
+  </nav>
+
+  <!-- SCORECARD -->
+  <div id="page-scorecard" class="page active">
+    <div style="margin-bottom:20px;margin-top:4px;">
+      <div class="golf-note">⛳ Golf Rules — Fewest Points Wins!</div>
+      <div class="section-title">Live Scores</div>
+      <div class="scoreboard" id="scoreboard"></div>
+    </div>
+    <div class="section-title">Holes</div>
+    <div class="hole-table-wrap">
+      <table>
+        <thead><tr>
+          <th class="hole-col">Hole / Pub</th>
+          <th id="th1">Team 1</th><th id="th2">Team 2</th><th id="th3">Team 3</th>
+        </tr></thead>
+        <tbody id="hole-tbody"></tbody>
+        <tfoot id="hole-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- QUESTS -->
+  <div id="page-quests" class="page">
+    <div class="golf-note">⚡ Quest points add to score · Multiple teams can be awarded the same quest</div>
+    <div class="section-title">Optional Quests</div>
+    <div id="quest-list" class="quest-list"></div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="page-leaderboard" class="page">
+    <div class="golf-note">⛳ Fewest Points Wins!</div>
+    <div class="section-title">Leaderboard</div>
+    <div id="leaderboard-content"></div>
+    <div style="margin-top:28px;">
+      <div class="section-title">Breakdown per Hole</div>
+      <div id="breakdown-content"></div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="page-admin" class="page">
+    <div id="admin-lock">
+      <div class="lock-icon">🔒</div>
+      <h2>Admin Access</h2>
+      <p>Enter password to continue</p>
+      <input type="password" id="admin-pw-input" placeholder="···" maxlength="20">
+      <button class="btn btn-gold" onclick="checkAdminPw()">Unlock</button>
+      <div class="lock-error" id="lock-error"></div>
+    </div>
+
+    <div id="admin-content">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="lockAdmin()">🔒 Lock Admin</button>
+      </div>
+      <div class="admin-grid">
+
+        <!-- Teams -->
+        <div class="admin-card">
+          <h3>👥 Teams — Names &amp; Photos</h3>
+          <div class="team-3-grid" style="margin-bottom:14px;">
+            <div class="team-col t1">
+              <label>Team 1</label>
+              <div class="photo-circle" id="photo-circle-0" onclick="document.getElementById('fi0').click()">👥</div>
+              <input type="file" id="fi0" accept="image/*" onchange="uploadPhoto(0,this)">
+              <div class="photo-hint">Tap to upload</div>
+              <input type="text" id="team0-input" placeholder="TEAM BEER" maxlength="16">
+              <button class="btn btn-danger btn-sm" onclick="removePhoto(0)">Remove photo</button>
+            </div>
+            <div class="team-col t2">
+              <label>Team 2</label>
+              <div class="photo-circle" id="photo-circle-1" onclick="document.getElementById('fi1').click()">👥</div>
+              <input type="file" id="fi1" accept="image/*" onchange="uploadPhoto(1,this)">
+              <div class="photo-hint">Tap to upload</div>
+              <input type="text" id="team1-input" placeholder="TEAM SHOTS" maxlength="16">
+              <button class="btn btn-danger btn-sm" onclick="removePhoto(1)">Remove photo</button>
+            </div>
+            <div class="team-col t3">
+              <label>Team 3</label>
+              <div class="photo-circle" id="photo-circle-2" onclick="document.getElementById('fi2').click()">👥</div>
+              <input type="file" id="fi2" accept="image/*" onchange="uploadPhoto(2,this)">
+              <div class="photo-hint">Tap to upload</div>
+              <input type="text" id="team2-input" placeholder="TEAM WINE" maxlength="16">
+              <button class="btn btn-danger btn-sm" onclick="removePhoto(2)">Remove photo</button>
+            </div>
+          </div>
+          <button class="btn btn-gold" onclick="saveTeamNames()">Save Team Names</button>
+        </div>
+
+        <!-- Holes -->
+        <div class="admin-card">
+          <h3>🍺 Pubs / Holes</h3>
+          <div class="form-row">
+            <input type="text" id="hole-name" placeholder="Pub name…">
+            <input type="text" id="hole-address" placeholder="Address (optional)">
+            <select id="hole-drink"><option value="">Select drink…</option></select>
+            <input type="number" id="hole-par" placeholder="Par" min="1" max="20" style="max-width:80px;">
+            <button class="btn btn-gold" onclick="addHole()">Add</button>
+          </div>
+          <div id="hole-list" class="item-list"></div>
+        </div>
+
+        <!-- Drink Types -->
+        <div class="admin-card">
+          <h3>🥃 Drink Types</h3>
+          <div class="form-row">
+            <input type="text" id="drink-name" placeholder="e.g. Pint of Lager, Tequila Shot…">
+            <button class="btn btn-gold" onclick="addDrinkType()">Add</button>
+          </div>
+          <div class="drink-tags" id="drink-tags"></div>
+        </div>
+
+        <!-- Quests -->
+        <div class="admin-card">
+          <h3>⚡ Quests</h3>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;">Quest points are added to a team's score. Multiple teams can earn the same quest.</p>
+          <div class="form-row">
+            <input type="text" id="quest-emoji" placeholder="🎯" style="max-width:60px;text-align:center;font-size:20px;">
+            <input type="text" id="quest-name" placeholder="Quest name…">
+            <input type="text" id="quest-desc" placeholder="Description…">
+            <input type="number" id="quest-pts" placeholder="Points" min="1" style="max-width:90px;">
+            <button class="btn btn-gold" onclick="addQuest()">Add</button>
+          </div>
+          <div id="quest-admin-list" class="item-list"></div>
+        </div>
+
+        <!-- Score Adjustment -->
+        <div class="admin-card">
+          <h3>🎲 Manual Score Adjustment</h3>
+          <div class="form-row">
+            <select id="adj-team">
+              <option value="0">Team 1</option>
+              <option value="1">Team 2</option>
+              <option value="2">Team 3</option>
+            </select>
+            <input type="number" id="adj-points" placeholder="Points (+ or -)">
+            <input type="text" id="adj-reason" placeholder="Reason…">
+            <button class="btn btn-gold" onclick="applyAdjustment()">Apply</button>
+          </div>
+          <div id="adj-log" class="item-list" style="max-height:200px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="admin-card" style="border-color:rgba(192,57,43,0.3);">
+          <h3 style="color:var(--red);">⚠️ Danger Zone</h3>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;">This will permanently delete ALL game data from Firebase. Cannot be undone.</p>
+          <button class="btn btn-danger" onclick="resetAllData()">🗑 Reset All Game Data</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ══ Firebase SDK ══════════════════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, onValue, set, update, remove, push }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ── Globals exposed to non-module scope ────────────────────────────────────
+let db, unsubscribe;
+window._fb = { set, update, remove, push, ref: null };
+
+// ── State (mirrors Firebase) ───────────────────────────────────────────────
+const S = {
+  teams:       ['TEAM BEER', 'TEAM SHOTS', 'TEAM WINE'],
+  photos:      [null, null, null],
+  holes:       [],
+  drinkTypes:  ['Pint of Lager', 'Tequila Shot', 'Cocktail', 'Beer Pong'],
+  scores:      {},
+  quests:      [],
+  qAwarded:    {},
+  adjustments: [],
+};
+const PASS = '1234';   // ← CHANGE THIS to your desired admin password
+let adminOpen = false;
+let localEditing = false; // prevent feedback loop while user types
+
+// ── Firebase — hardcoded config (no setup screen needed) ──────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBRe0QCE45-XGxfo_kVQC1jMc-66e8cV_s",
+  authDomain:        "pub-golfik.firebaseapp.com",
+  databaseURL:       "https://pub-golfik-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "pub-golfik",
+  storageBucket:     "pub-golfik.firebasestorage.app",
+  messagingSenderId: "439184818554",
+  appId:             "1:439184818554:web:fc03b531571f30e13b96c3"
+};
+
+(function initFirebase() {
+  try {
+    const app = initializeApp(FIREBASE_CONFIG);
+    db = getDatabase(app);
+    window._fb.ref = (path) => ref(db, path);
+    launchApp();
+  } catch(e) {
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;font-family:sans-serif;color:#e8dcc8;background:#0d0b08;padding:20px;text-align:center;">
+      <div style="font-size:48px">⚠️</div>
+      <div style="font-size:20px;color:#d4a017">Firebase connection failed</div>
+      <div style="font-size:14px;color:#a09070;max-width:400px">${e.message}</div>
+    </div>`;
+  }
+})();
+
+function launchApp() {
+  setSyncStatus('syncing');
+
+  // Listen to entire game state in real-time
+  const gameRef = ref(db, 'game');
+  onValue(gameRef, snap => {
+    if (localEditing) return; // skip while user is typing a score
+    const data = snap.val();
+    if (data) {
+      if (data.teams)       S.teams       = data.teams;
+      if (data.photos)      S.photos      = data.photos;
+      if (data.holes)       S.holes       = data.holes;
+      if (data.drinkTypes)  S.drinkTypes  = data.drinkTypes;
+      if (data.scores)      S.scores      = data.scores;
+      if (data.quests)      S.quests      = data.quests;
+      if (data.qAwarded)    S.qAwarded    = data.qAwarded;
+      if (data.adjustments) S.adjustments = data.adjustments;
+    }
+    setSyncStatus('online');
+    rAll();
+  }, err => {
+    setSyncStatus('offline');
+    console.error('Firebase error:', err);
+  });
+}
+
+// ── Persist to Firebase ───────────────────────────────────────────────────
+function persist() {
+  if (!db) return;
+  const { ref: fbRef, set: fbSet } = window._fb;
+  setSyncStatus('syncing');
+  fbSet(fbRef('game'), {
+    teams:       S.teams,
+    photos:      S.photos,
+    holes:       S.holes,
+    drinkTypes:  S.drinkTypes,
+    scores:      S.scores,
+    quests:      S.quests,
+    qAwarded:    S.qAwarded,
+    adjustments: S.adjustments,
+  }).then(() => setSyncStatus('online'))
+    .catch(() => setSyncStatus('offline'));
+}
+
+// ── Sync status UI ────────────────────────────────────────────────────────
+function setSyncStatus(state) {
+  const bar = document.getElementById('sync-bar');
+  const ind = document.getElementById('sync-indicator');
+  bar.className = state;
+  ind.className = 'sync-indicator ' + state;
+  ind.textContent = state === 'online' ? '● Live' : state === 'syncing' ? '● Syncing…' : '● Offline';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+let toastT;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2400);
+}
+function uid() { return Math.random().toString(36).slice(2,9); }
+const TC = i => ['var(--team1)','var(--team2)','var(--team3)'][i];
+
+// ── Scoring ───────────────────────────────────────────────────────────────
+function holeScore(ti) {
+  return S.holes.reduce((s,h) => s + (Number((S.scores[h.id]||[0,0,0])[ti])||0), 0);
+}
+function totalScore(ti) {
+  let s = holeScore(ti);
+  S.quests.forEach(q => { if ((S.qAwarded[q.id]||{})[ti]) s += Number(q.pts)||0; });
+  S.adjustments.forEach(a => { if (a.ti===ti) s += Number(a.pts)||0; });
+  return s;
+}
+
+// ── Render: Scoreboard ────────────────────────────────────────────────────
+function rScoreboard() {
+  const tots = S.teams.map((_,i) => totalScore(i));
+  const anyScore = tots.some(v => v > 0);
+  const minVal = Math.min(...tots);
+  document.getElementById('scoreboard').innerHTML = S.teams.map((name,i) => {
+    const leader = anyScore && tots[i]===minVal;
+    const ph = S.photos[i];
+    return `<div class="score-card t${i+1}${leader?' leader':''}">
+      <div class="team-photo-wrap">${ph?`<img src="${ph}">`:'👥'}</div>
+      <div class="team-name">${name}</div>
+      ${leader?'<div><span class="leader-badge">⛳ Leader</span></div>':''}
+      <div class="total-score">${tots[i]}</div>
+      <div class="score-label">Points</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render: Hole Table ────────────────────────────────────────────────────
+function rHoleTable() {
+  S.teams.forEach((n,i) => document.getElementById('th'+(i+1)).textContent = n);
+  const tbody = document.getElementById('hole-tbody');
+  const tfoot = document.getElementById('hole-tfoot');
+  if (!S.holes.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><span class="icon">🍺</span>No pubs added yet — go to Admin</div></td></tr>`;
+    tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = S.holes.map((h,hi) => {
+    const sc = S.scores[h.id]||[0,0,0];
+    const cells = S.teams.map((_,ti) =>
+      `<td><input type="number" class="score-input t${ti+1}" value="${sc[ti]||''}" placeholder="0" min="0"
+        onchange="window._setScore('${h.id}',${ti},this.value)"
+        onfocus="window._localEdit(true)"
+        onblur="window._localEdit(false)"></td>`).join('');
+    return `<tr>
+      <td class="hole-info">
+        <span class="hole-num">${hi+1}</span>
+        <span style="font-weight:600;color:var(--text)"> ${h.name}</span>
+        ${h.drink?`<div class="hole-drink">🥃 ${h.drink}${h.par?' · Par '+h.par:''}</div>`:h.par?`<div class="hole-drink">Par ${h.par}</div>`:''}
+        ${h.address?`<div class="hole-drink">📍 ${h.address}</div>`:''}
+      </td>${cells}</tr>`;
+  }).join('');
+  const cts = S.teams.map((_,i) => holeScore(i));
+  tfoot.innerHTML = `<tr class="totals-row">
+    <td class="label">Total (holes)</td>
+    ${cts.map((v,i)=>`<td style="color:${TC(i)}">${v}</td>`).join('')}
+  </tr>`;
+}
+
+window._localEdit = (v) => { localEditing = v; };
+window._setScore = function(holeId, ti, val) {
+  if (!S.scores[holeId]) S.scores[holeId]=[0,0,0];
+  S.scores[holeId][ti] = Number(val)||0;
+  persist(); rScoreboard(); rLeaderboard();
+};
+
+// ── Render: Quests ────────────────────────────────────────────────────────
+function rQuests() {
+  const el = document.getElementById('quest-list');
+  if (!S.quests.length) {
+    el.innerHTML = `<div class="empty-state"><span class="icon">⚡</span>No quests yet — add them in Admin</div>`;
+    return;
+  }
+  el.innerHTML = S.quests.map(q => {
+    const aw = S.qAwarded[q.id]||{};
+    const teamBtns = S.teams.map((name,i) => {
+      const on = !!aw[i];
+      return `<div class="quest-team-award${on?' aw-t'+(i+1):''}" onclick="window._toggleQuest('${q.id}',${i})">
+        <div class="award-check">${on?'✅':'⬜'}</div>
+        <div>${name}</div>
+      </div>`;
+    }).join('');
+    return `<div class="quest-item">
+      <div class="quest-top">
+        <div class="quest-emoji">${q.emoji||'🎯'}</div>
+        <div class="quest-desc"><strong>${q.name}</strong><span>${q.desc||''}</span></div>
+        <div class="quest-pts">+${q.pts} pts</div>
+      </div>
+      <div class="quest-team-row">${teamBtns}</div>
+    </div>`;
+  }).join('');
+}
+
+window._toggleQuest = function(qid, ti) {
+  if (!S.qAwarded[qid]) S.qAwarded[qid]={};
+  S.qAwarded[qid][ti] = !S.qAwarded[qid][ti];
+  persist(); rAll();
+  const q = S.quests.find(q=>q.id===qid);
+  toast(S.qAwarded[qid][ti]
+    ? `Quest awarded to ${S.teams[ti]}! +${q?.pts} pts`
+    : `Quest removed from ${S.teams[ti]}`);
+};
+
+// ── Render: Leaderboard ───────────────────────────────────────────────────
+function rLeaderboard() {
+  const tots = S.teams.map((n,i)=>({name:n,score:totalScore(i),idx:i}));
+  tots.sort((a,b)=>a.score-b.score);
+  const medals = ['🥇','🥈','🥉'];
+  document.getElementById('leaderboard-content').innerHTML = tots.map((t,r) => {
+    const ph = S.photos[t.idx];
+    const qPts = S.quests.reduce((s,q)=>s+((S.qAwarded[q.id]||{})[t.idx]?Number(q.pts):0),0);
+    const adjPts = S.adjustments.filter(a=>a.ti===t.idx).reduce((s,a)=>s+Number(a.pts),0);
+    return `<div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--surface2);
+      border:1px solid var(--border);border-radius:12px;margin-bottom:10px;border-left:4px solid ${TC(t.idx)};">
+      <div style="font-size:32px">${medals[r]||''}</div>
+      <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;border:2px solid ${TC(t.idx)};
+        background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
+        ${ph?`<img src="${ph}" style="width:100%;height:100%;object-fit:cover;">`:'👥'}
+      </div>
+      <div style="flex:1">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:${TC(t.idx)}">${t.name}</div>
+        <div style="font-size:12px;color:var(--text-muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:1.5px;text-transform:uppercase;">
+          Holes: ${holeScore(t.idx)} · Quests: ${qPts} · Adj: ${adjPts}
+        </div>
+      </div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--text)">${t.score}</div>
+    </div>`;
+  }).join('');
+
+  const bel = document.getElementById('breakdown-content');
+  if (!S.holes.length) { bel.innerHTML=`<div class="empty-state" style="padding:20px 0"><span class="icon">📋</span>No holes yet</div>`; return; }
+  bel.innerHTML = `<div class="hole-table-wrap"><table>
+    <thead><tr><th class="hole-col">Hole</th>${S.teams.map((n,i)=>`<th style="color:${TC(i)}">${n}</th>`).join('')}</tr></thead>
+    <tbody>${S.holes.map((h,hi)=>{
+      const sc=S.scores[h.id]||[0,0,0];
+      return `<tr><td class="hole-info"><span class="hole-num">${hi+1}</span> ${h.name}${h.drink?`<div class="hole-drink">🥃 ${h.drink}</div>`:''}</td>${S.teams.map((_,ti)=>`<td>${sc[ti]||0}</td>`).join('')}</tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+// ── Admin: Password ───────────────────────────────────────────────────────
+window.checkAdminPw = function() {
+  const pw = document.getElementById('admin-pw-input').value;
+  if (pw === PASS) {
+    adminOpen = true;
+    document.getElementById('admin-lock').style.display='none';
+    document.getElementById('admin-content').style.display='block';
+    document.getElementById('lock-error').textContent='';
+    rAll();
+  } else {
+    document.getElementById('lock-error').textContent='✕ Wrong password';
+    document.getElementById('admin-pw-input').value='';
+    const inp = document.getElementById('admin-pw-input');
+    inp.style.borderColor='var(--red)';
+    setTimeout(()=>inp.style.borderColor='',1500);
+  }
+};
+window.lockAdmin = function() {
+  adminOpen=false;
+  document.getElementById('admin-lock').style.display='flex';
+  document.getElementById('admin-content').style.display='none';
+  document.getElementById('admin-pw-input').value='';
+};
+
+// ── Admin: Team Names ─────────────────────────────────────────────────────
+window.saveTeamNames = function() {
+  [0,1,2].forEach(i => {
+    const v = document.getElementById('team'+i+'-input').value.trim().toUpperCase();
+    if (v) S.teams[i]=v;
+  });
+  persist(); rAll(); toast('Team names saved!');
+};
+
+// ── Admin: Photos ─────────────────────────────────────────────────────────
+window.uploadPhoto = function(ti, input) {
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { S.photos[ti]=e.target.result; persist(); rAll(); toast(`Photo set for ${S.teams[ti]}!`); };
+  r.readAsDataURL(file);
+};
+window.removePhoto = function(ti) { S.photos[ti]=null; persist(); rAll(); toast('Photo removed'); };
+function syncPhotoPreviews() {
+  [0,1,2].forEach(i => {
+    const el=document.getElementById('photo-circle-'+i);
+    if (!el) return;
+    el.innerHTML = S.photos[i] ? `<img src="${S.photos[i]}">` : '👥';
+    const inp=document.getElementById('team'+i+'-input');
+    if (inp) inp.value = S.teams[i];
+  });
+}
+
+// ── Admin: Holes ──────────────────────────────────────────────────────────
+window.addHole = function() {
+  const name=document.getElementById('hole-name').value.trim();
+  if (!name) return toast('Enter a pub name!');
+  S.holes.push({id:uid(),name,address:document.getElementById('hole-address').value.trim(),drink:document.getElementById('hole-drink').value,par:parseInt(document.getElementById('hole-par').value)||null});
+  ['hole-name','hole-address','hole-par'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('hole-drink').value='';
+  persist(); rAll(); toast(`"${name}" added!`);
+};
+window.removeHole = function(id) { S.holes=S.holes.filter(h=>h.id!==id); delete S.scores[id]; persist(); rAll(); toast('Pub removed'); };
+function rHoleList() {
+  const el=document.getElementById('hole-list'); if(!el) return;
+  el.innerHTML = S.holes.length
+    ? S.holes.map((h,i)=>`<div class="item-row"><span class="item-num">${i+1}</span><div class="item-text"><div>${h.name}</div><div class="item-sub">${[h.drink,h.address,h.par?'Par '+h.par:''].filter(Boolean).join(' · ')||'No details'}</div></div><div class="item-actions"><button class="btn btn-danger btn-sm" onclick="window.removeHole('${h.id}')">Remove</button></div></div>`).join('')
+    : `<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No pubs added yet</div>`;
+}
+
+// ── Admin: Drink Types ────────────────────────────────────────────────────
+window.addDrinkType = function() {
+  const name=document.getElementById('drink-name').value.trim();
+  if (!name||S.drinkTypes.includes(name)) return toast('Enter a new drink type!');
+  S.drinkTypes.push(name); document.getElementById('drink-name').value='';
+  persist(); rDrinkTypes(); toast(`Added "${name}"`);
+};
+window.removeDrinkType = function(name) { S.drinkTypes=S.drinkTypes.filter(d=>d!==name); persist(); rDrinkTypes(); };
+function rDrinkTypes() {
+  const tags=document.getElementById('drink-tags'); if(!tags) return;
+  tags.innerHTML=S.drinkTypes.map(d=>`<div class="drink-tag">🥃 ${d}<button onclick="window.removeDrinkType(${JSON.stringify(d)})">✕</button></div>`).join('');
+  const sel=document.getElementById('hole-drink'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Select drink…</option>'+S.drinkTypes.map(d=>`<option value="${d}"${d===cur?' selected':''}>${d}</option>`).join('');
+}
+
+// ── Admin: Quests ─────────────────────────────────────────────────────────
+window.addQuest = function() {
+  const name=document.getElementById('quest-name').value.trim();
+  if (!name) return toast('Enter a quest name!');
+  S.quests.push({id:uid(),name,desc:document.getElementById('quest-desc').value.trim(),emoji:document.getElementById('quest-emoji').value.trim()||'🎯',pts:parseInt(document.getElementById('quest-pts').value)||5});
+  ['quest-name','quest-desc','quest-emoji','quest-pts'].forEach(id=>document.getElementById(id).value='');
+  persist(); rAll(); toast(`Quest "${name}" added!`);
+};
+window.removeQuest = function(id) { S.quests=S.quests.filter(q=>q.id!==id); delete S.qAwarded[id]; persist(); rAll(); toast('Quest removed'); };
+function rQuestAdmin() {
+  const el=document.getElementById('quest-admin-list'); if(!el) return;
+  el.innerHTML=S.quests.length
+    ? S.quests.map(q=>`<div class="item-row"><span style="font-size:20px">${q.emoji}</span><div class="item-text"><div>${q.name}</div><div class="item-sub">${q.desc||'No description'} · <strong style="color:var(--gold)">+${q.pts} pts</strong></div></div><div class="item-actions"><button class="btn btn-danger btn-sm" onclick="window.removeQuest('${q.id}')">Remove</button></div></div>`).join('')
+    : `<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No quests yet</div>`;
+}
+
+// ── Admin: Adjustments ────────────────────────────────────────────────────
+window.applyAdjustment = function() {
+  const ti=parseInt(document.getElementById('adj-team').value);
+  const pts=parseInt(document.getElementById('adj-points').value);
+  if (isNaN(pts)) return toast('Enter a point value!');
+  S.adjustments.push({ti,pts,reason:document.getElementById('adj-reason').value.trim()||'Manual',ts:Date.now()});
+  document.getElementById('adj-points').value=''; document.getElementById('adj-reason').value='';
+  persist(); rAll(); toast(`${pts>0?'+':''}${pts} pts → ${S.teams[ti]}`);
+};
+function rAdjLog() {
+  const el=document.getElementById('adj-log'); const sel=document.getElementById('adj-team');
+  if(!el||!sel) return;
+  S.teams.forEach((n,i)=>{ if(sel.options[i]) sel.options[i].textContent=n; });
+  el.innerHTML=S.adjustments.length
+    ? [...S.adjustments].reverse().map(a=>`<div class="item-row"><div class="item-text"><div>${S.teams[a.ti]} <strong style="color:${a.pts>=0?'var(--green)':'var(--red)'}">${a.pts>0?'+':''}${a.pts} pts</strong></div><div class="item-sub">${a.reason}</div></div></div>`).join('')
+    : `<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No adjustments yet</div>`;
+}
+
+// ── Admin: Reset ──────────────────────────────────────────────────────────
+window.resetAllData = function() {
+  if (!confirm('⚠️ This will DELETE ALL game data permanently. Are you sure?')) return;
+  Object.assign(S, {
+    teams: ['TEAM BEER', 'TEAM SHOTS', 'TEAM WINE'],
+    photos: [null, null, null], holes: [], drinkTypes: ['Pint of Lager', 'Tequila Shot', 'Cocktail', 'Beer Pong'],
+    scores: {}, quests: [], qAwarded: {}, adjustments: []
+  });
+  persist(); rAll(); toast('All data reset!');
+};
+
+// ── Render All ────────────────────────────────────────────────────────────
+function rAll() {
+  rScoreboard(); rHoleTable(); rQuests(); rLeaderboard();
+  if (adminOpen) { rHoleList(); rDrinkTypes(); rQuestAdmin(); rAdjLog(); syncPhotoPreviews(); }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+window.showPage = function(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  ['scorecard','quests','leaderboard','admin'].forEach((p,i)=>{
+    if(p===id) document.querySelectorAll('.nav-tab')[i]?.classList.add('active');
+  });
+  if (id==='admin' && !adminOpen) {
+    document.getElementById('admin-lock').style.display='flex';
+    document.getElementById('admin-content').style.display='none';
+  }
+};
+
+document.getElementById('admin-pw-input').addEventListener('keydown', e=>{ if(e.key==='Enter') window.checkAdminPw(); });
+
+</script>
+</body>
+</html>
