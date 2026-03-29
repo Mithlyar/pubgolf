@@ -237,36 +237,8 @@
 </head>
 <body>
 
-<!-- ══ SETUP SCREEN (shown until Firebase config is pasted) ══════════════════ -->
-<div id="setup-screen">
-  <div style="font-size:56px">🍺</div>
-  <h1>PUB CRAWL</h1>
-  <p>This app syncs in real-time across all devices using Firebase.<br>Paste your Firebase config below to get started.</p>
-
-  <div class="setup-card">
-    <h2>🔥 Firebase Config</h2>
-    <div class="setup-hint" style="margin-bottom:16px;">
-      Go to <strong>console.firebase.google.com</strong> → your project → ⚙️ Project Settings → scroll to <em>"Your apps"</em> → pick the Web app → copy the <code>firebaseConfig</code> object and paste it here.
-    </div>
-    <label class="setup-label">Paste your firebaseConfig JSON here</label>
-    <textarea class="setup-input" id="fb-config-input" rows="10" placeholder='{
-  "apiKey": "AIza...",
-  "authDomain": "your-app.firebaseapp.com",
-  "databaseURL": "https://your-app-default-rtdb.firebaseio.com",
-  "projectId": "your-app",
-  "storageBucket": "your-app.appspot.com",
-  "messagingSenderId": "123456789",
-  "appId": "1:123456789:web:abc123"
-}'></textarea>
-    <div class="setup-error" id="setup-error"></div>
-    <button class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="connectFirebase()">🔥 Connect &amp; Launch</button>
-  </div>
-
-  <p style="font-size:12px;opacity:0.5">Your config is saved in this browser so you only need to do this once per device.</p>
-</div>
-
-<!-- ══ MAIN APP (hidden until Firebase connects) ════════════════════════════ -->
-<div id="app" style="display:none;">
+<!-- ══ MAIN APP ════════════════════════════════════════════════════════════ -->
+<div id="app">
   <div id="sync-bar"></div>
   <div class="sync-indicator" id="sync-indicator">● Connecting…</div>
 
@@ -333,7 +305,6 @@
 
     <div id="admin-content">
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-outline btn-sm" onclick="disconnectFirebase()">🔌 Change Firebase Config</button>
         <button class="btn btn-outline btn-sm" onclick="lockAdmin()">🔒 Lock Admin</button>
       </div>
       <div class="admin-grid">
@@ -462,50 +433,36 @@ const PASS = '1234';   // ← CHANGE THIS to your desired admin password
 let adminOpen = false;
 let localEditing = false; // prevent feedback loop while user types
 
-// ── Firebase Setup ─────────────────────────────────────────────────────────
-window.connectFirebase = function() {
-  const raw = document.getElementById('fb-config-input').value.trim();
-  const errEl = document.getElementById('setup-error');
-  errEl.textContent = '';
-  let cfg;
+// ── Firebase — hardcoded config (no setup screen needed) ──────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBRe0QCE45-XGxfo_kVQC1jMc-66e8cV_s",
+  authDomain:        "pub-golfik.firebaseapp.com",
+  databaseURL:       "https://pub-golfik-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "pub-golfik",
+  storageBucket:     "pub-golfik.firebasestorage.app",
+  messagingSenderId: "439184818554",
+  appId:             "1:439184818554:web:fc03b531571f30e13b96c3"
+};
+
+(function initFirebase() {
   try {
-    // Accept both JS object and JSON (with or without quotes on keys)
-    const json = raw
-      .replace(/^\s*const\s+\w+\s*=\s*/, '')
-      .replace(/;\s*$/, '')
-      .replace(/(\w+)\s*:/g, '"$1":')   // bare keys → quoted
-      .replace(/'/g, '"');              // single → double quotes
-    cfg = JSON.parse(json);
-  } catch(e) {
-    errEl.textContent = '✕ Could not parse config — make sure you pasted the full object.';
-    return;
-  }
-  if (!cfg.databaseURL) {
-    errEl.textContent = '✕ Missing "databaseURL" — make sure Realtime Database is enabled in Firebase.';
-    return;
-  }
-  try {
-    const app = initializeApp(cfg);
+    const app = initializeApp(FIREBASE_CONFIG);
     db = getDatabase(app);
     window._fb.ref = (path) => ref(db, path);
-    localStorage.setItem('fb_cfg', JSON.stringify(cfg));
     launchApp();
   } catch(e) {
-    errEl.textContent = '✕ Firebase error: ' + e.message;
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;font-family:sans-serif;color:#e8dcc8;background:#0d0b08;padding:20px;text-align:center;">
+      <div style="font-size:48px">⚠️</div>
+      <div style="font-size:20px;color:#d4a017">Firebase connection failed</div>
+      <div style="font-size:14px;color:#a09070;max-width:400px">${e.message}</div>
+    </div>`;
   }
-};
-
-window.disconnectFirebase = function() {
-  localStorage.removeItem('fb_cfg');
-  location.reload();
-};
+})();
 
 function launchApp() {
-  document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
   setSyncStatus('syncing');
 
-  // Listen to entire game state
+  // Listen to entire game state in real-time
   const gameRef = ref(db, 'game');
   onValue(gameRef, snap => {
     if (localEditing) return; // skip while user is typing a score
@@ -526,19 +483,6 @@ function launchApp() {
     setSyncStatus('offline');
     console.error('Firebase error:', err);
   });
-}
-
-// ── Try auto-connect from saved config ────────────────────────────────────
-const saved = localStorage.getItem('fb_cfg');
-if (saved) {
-  try {
-    const cfg = JSON.parse(saved);
-    document.getElementById('fb-config-input').value = JSON.stringify(cfg, null, 2);
-    const app = initializeApp(cfg);
-    db = getDatabase(app);
-    window._fb.ref = (path) => ref(db, path);
-    launchApp();
-  } catch(e) { /* fall through to setup screen */ }
 }
 
 // ── Persist to Firebase ───────────────────────────────────────────────────
